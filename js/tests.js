@@ -306,6 +306,39 @@
     return '6 demo students created and removed';
   });
 
+  await test('Built-in class lists load once, only into empty classes', async function () {
+    const total = Object.values(MP.CLASS_ROSTER).reduce(function (n, l) { return n + l.length; }, 0);
+    const fresh = async function () {
+      await st.close();
+      await new Promise(function (resolve) { const r = indexedDB.deleteDatabase('magic-picker-test-roster'); r.onsuccess = r.onerror = r.onblocked = function () { resolve(); }; });
+      st.useDatabase('magic-picker-test-roster');
+      await st.init();
+      const byName = {}; (await st.listClasses()).forEach(function (c) { byName[c.name] = c; });
+      return byName;
+    };
+    // fresh device: every class gets its list
+    let cls = await fresh();
+    let r = await st.applyRoster(MP.CLASS_ROSTER, MP.ROSTER_VERSION);
+    expect(r.added === total, 'added ' + r.added + ' of ' + total);
+    for (const name of Object.keys(MP.CLASS_ROSTER)) {
+      const n = (await st.listStudents(cls[name].id)).length;
+      expect(n === MP.CLASS_ROSTER[name].length, name + ' has ' + n);
+    }
+    r = await st.applyRoster(MP.CLASS_ROSTER, MP.ROSTER_VERSION);
+    expect(r.added === 0, 'second run added ' + r.added);
+    // a class the teacher already filled is left alone
+    cls = await fresh();
+    await st.addStudents(cls.J5A.id, ['Own Student']);
+    r = await st.applyRoster(MP.CLASS_ROSTER, MP.ROSTER_VERSION);
+    const j5a = await st.listStudents(cls.J5A.id);
+    expect(j5a.length === 1 && j5a[0].name === 'Own Student', 'J5A was changed');
+    expect(r.added === total - MP.CLASS_ROSTER.J5A.length, 'added ' + r.added);
+    await st.close();
+    await new Promise(function (resolve) { const q = indexedDB.deleteDatabase('magic-picker-test-roster'); q.onsuccess = q.onerror = q.onblocked = function () { resolve(); }; });
+    st.useDatabase('magic-picker-test');
+    return total + ' students in ' + Object.keys(MP.CLASS_ROSTER).length + ' classes; filled classes untouched';
+  });
+
   const failed = results.filter(function (r) { return !r; }).length;
   const sum = document.getElementById('summary');
   sum.textContent = failed ? (failed + ' of ' + results.length + ' tests FAILED') : ('All ' + results.length + ' tests passed');

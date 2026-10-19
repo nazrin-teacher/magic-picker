@@ -274,8 +274,9 @@ window.MP = window.MP || {};
   }
 
   /* ---------- students ---------- */
+  /* Turkish alphabetical order for the children's names (C before Ç, I before İ ...). */
   function sortStudents(list) {
-    return list.sort(function (a, b) { return a.name.localeCompare(b.name) || a.createdAt.localeCompare(b.createdAt); });
+    return list.sort(function (a, b) { return a.name.localeCompare(b.name, 'tr') || a.createdAt.localeCompare(b.createdAt); });
   }
 
   function listStudents(classId, opts) {
@@ -673,6 +674,41 @@ window.MP = window.MP || {};
     }).then(init);
   }
 
+  /* ---------- built-in class lists (js/roster.js) ---------- */
+  /*
+   * Applied once per device and roster version. Names only go into classes that have no students
+   * yet, so nothing a teacher has added, edited, archived or deleted is ever overwritten.
+   */
+  function applyRoster(roster, version) {
+    if (!roster) return Promise.resolve({ added: 0 });
+    return run(['meta', 'classes', 'students'], 'readwrite', async function (t) {
+      const mark = await req(S(t, 'meta').get('roster'));
+      if (mark && mark.version >= version) return { added: 0, skipped: true };
+      const classes = await req(S(t, 'classes').getAll());
+      let added = 0;
+      for (const name of Object.keys(roster)) {
+        let c = classes.find(function (x) { return x.name.toLowerCase() === name.toLowerCase(); });
+        if (!c) {
+          c = { id: uuid(), name: name, archived: false, isDemo: false, order: classes.length, createdAt: now() };
+          await req(S(t, 'classes').add(c));
+          classes.push(c);
+        }
+        if (await req(S(t, 'students').index('classId').count(c.id))) continue;
+        for (const studentName of roster[name]) {
+          const clean = cleanName(studentName);
+          if (!clean) continue;
+          await req(S(t, 'students').add({
+            id: uuid(), classId: c.id, name: clean, archived: false, isDemo: false,
+            totalEarned: 0, balance: 0, createdAt: new Date(Date.now() + added).toISOString()
+          }));
+          added++;
+        }
+      }
+      await req(S(t, 'meta').put({ key: 'roster', version: version, appliedAt: now(), added: added }));
+      return { added: added };
+    });
+  }
+
   /* ---------- demo data (clearly labelled, removable) ---------- */
   async function loadDemo() {
     const existing = (await listClasses({ includeArchived: true })).find(function (c) { return c.isDemo; });
@@ -725,7 +761,7 @@ window.MP = window.MP || {};
     peekUndo, undoLast, listTxs,
     getRound, setNoRepeats, newRound, pickStudent,
     exportBackup, validateBackup, restoreBackup, resetAll,
-    loadDemo, removeDemo, requestPersistence, useDatabase, close,
+    applyRoster, loadDemo, removeDemo, requestPersistence, useDatabase, close,
     uuid, randInt
   };
 })();

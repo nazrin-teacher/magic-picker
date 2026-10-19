@@ -15,7 +15,7 @@ A classroom student picker and star-and-card collection for children aged 5–6.
 Class → tap a name or **Pick a Student** → the teacher gives stars → **Choose a Card** → **My Collection**
 
 - Teacher tools: **Teacher** at the top right. While the panel is unlocked, `+1 +2 +3 / Other` star buttons appear on the student screens; **Lock** hides them.
-- First step: Teacher → Students → add names one at a time or many at once (one name per line). To try the app first, use Backup & Data → **Load demo data** (a separate “DEMO” class that one click removes).
+- The class lists are already built in: every class shows its students the first time the site opens. Add, rename or archive students under Teacher → Students. To try the app first, use Backup & Data → **Load demo data** (a separate “DEMO” class that one click removes).
 
 ## Rules
 
@@ -45,7 +45,7 @@ Card sheets are always A5; printed cards are the same size as the album slots: 5
 - Data stays only in this browser on this device; it does **not sync** between devices and there is no cloud copy. Download a backup regularly from Backup & Data → **Download backup (JSON)**.
 - Restoring checks the file first; a broken file does not change the current data.
 - The PIN only hides the teacher tools on this screen; it is **not real authentication** and it does not encrypt the data.
-- Student names are never part of this repository or the website. Class lists are loaded on the classroom device from a backup file.
+- The 2025–2026 class lists are built in (`js/roster.js`) as first name + surname initial only. On each device they are loaded once into classes that are still empty; names you add, edit or delete afterwards are never overwritten.
 
 ## Files
 

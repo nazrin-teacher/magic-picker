@@ -562,11 +562,11 @@ window.MP = window.MP || {};
             }
           }, 'Remove demo data'))),
       h('div', { class: 't-card' }, h('h2', null, 'Reset everything'),
-        h('p', null, 'All classes, students, stars, cards, history and settings are deleted, and the 7 default classes (J5A–J6E) are created again, empty.'),
+        h('p', null, 'All classes, students, stars, cards, history and settings are deleted, and the 7 classes (J5A–J6E) are created again with their built-in class lists.'),
         h('button', {
           class: 'tbtn danger', onclick: async function () {
             if (await ui.confirmDialog({ title: 'Delete ALL data?', message: ['This cannot be undone.', 'Download a backup first.'], okText: 'Delete everything', danger: true, typeToConfirm: 'RESET' })) {
-              act(async function () { await st.resetAll(); await app().refreshSettings(); app().setTeacher(true); T.classId = null; }, 'All data was reset.').catch(function () {});
+              act(async function () { await st.resetAll(); await st.applyRoster(MP.CLASS_ROSTER, MP.ROSTER_VERSION); await app().refreshSettings(); app().setTeacher(true); T.classId = null; }, 'All data was reset.').catch(function () {});
             }
           }
         }, 'Reset everything'))));

@@ -11,6 +11,7 @@ window.MP = window.MP || {};
   async function boot() {
     try {
       await st.init();
+      try { await st.applyRoster(MP.CLASS_ROSTER, MP.ROSTER_VERSION); } catch (e) { console.error('Class lists could not be loaded', e); }
       state.settings = await st.getSettings();
     } catch (e) {
       console.error(e);
