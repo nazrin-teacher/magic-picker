@@ -500,3 +500,36 @@ html.reduce-motion .burst, html.reduce-motion .float-star, html.reduce-motion .f
   .tb-btn { min-height: 46px; padding: 0 14px; }
   .btn { padding: 0 22px; }
 }
+
+/* ---------- picture symbols ---------- */
+.symbol { display: inline-block; flex: none; line-height: 0; width: 40px; height: 40px; }
+.symbol svg { width: 100%; height: 100%; filter: drop-shadow(0 2px 3px rgba(20, 10, 60, .28)); }
+.symbol-none { visibility: hidden; }
+.sym-tile { width: clamp(44px, 4.6vw, 58px); height: clamp(44px, 4.6vw, 58px); }
+.sym-hero { width: clamp(64px, 8vw, 96px); height: clamp(64px, 8vw, 96px); }
+.sym-pick { width: clamp(72px, 10vw, 112px); height: clamp(72px, 10vw, 112px); }
+.sym-cover { width: 3.4em; height: 3.4em; margin-bottom: 3%; }
+.sym-small { width: 28px; height: 28px; vertical-align: middle; margin-right: 8px; }
+.tile-top { display: flex; align-items: center; gap: 12px; width: 100%; min-width: 0; }
+.tile-top .name { min-width: 0; }
+.hero-row { display: flex; align-items: center; gap: clamp(12px, 2vw, 20px); }
+.hero-class.row { gap: 12px; }
+.pick-symbol { min-height: 1px; margin-bottom: 10px; }
+.symbol-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(54px, 1fr)); gap: 8px; margin-bottom: 6px; }
+.symbol-grid button { min-height: 54px; padding: 5px; border-radius: 12px; border: 2px solid #d8c9a3; background: #fff; display: grid; place-items: center; }
+.symbol-grid button .symbol { width: 38px; height: 38px; }
+.symbol-grid button[aria-pressed="true"] { border-color: var(--teal-d); box-shadow: 0 0 0 3px var(--teal); }
+.symbol-grid button:disabled { opacity: .28; cursor: not-allowed; }
+
+/* ---------- who is here today ---------- */
+.here-line { font-weight: 600; color: #fff3c4; }
+.student-tile.away { opacity: .55; filter: grayscale(.7); }
+.student-grid.marking .student-tile { outline: 3px dashed rgba(159, 243, 238, .9); outline-offset: 3px; }
+.student-grid.marking .student-tile.away { opacity: .75; }
+.away-chip { display: inline-flex; align-items: center; padding: 4px 12px; border-radius: 999px; background: #e3dcef; color: #43376a; font-weight: 600; font-size: 1.05rem; }
+.away-chip.here { background: var(--teal-d); color: #fff; }
+
+/* ---------- backup reminder ---------- */
+.backup-reminder { margin-top: 12px; display: flex; gap: 12px; align-items: center; flex-wrap: wrap; justify-content: space-between;
+  background: #fff3cd; color: #4a3500; border: 2px solid var(--gold); border-radius: 14px; padding: 12px 14px; line-height: 1.45; }
+.backup-reminder span { flex: 1 1 320px; min-width: 0; }

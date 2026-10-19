@@ -69,6 +69,34 @@ window.MP = window.MP || {};
     await render();
   }
 
+  /* For quick teacher actions on the class screen (e.g. who is here today): asks for the PIN only if one is set. */
+  async function requireTeacher() {
+    const s = app().state;
+    if (s.teacher || !s.settings.pin) return true;
+    const pin = await pinPad('Teacher PIN', 'Enter the PIN to continue.');
+    if (pin == null) return false;
+    if ((await hashPin(pin, s.settings.pin.salt)) !== s.settings.pin.hash) { MP.sound.play('error'); ui.toast('Wrong PIN.', 'error'); return false; }
+    app().setTeacher(true);
+    return true;
+  }
+
+  /* Downloads a full backup and remembers when, for the reminder. Returns true only if the file was saved. */
+  async function downloadBackup() {
+    try {
+      const b = await st.exportBackup();
+      const d = new Date();
+      const stamp = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0') + '_' + String(d.getHours()).padStart(2, '0') + String(d.getMinutes()).padStart(2, '0');
+      await ui.download('magic-picker-backup-' + stamp + '.json', JSON.stringify(b, null, 1));
+      try { await st.markBackup(); } catch (_) { /* the file is saved; only the reminder date is missing */ }
+      ui.toast('Backup file downloaded.', 'ok');
+      return true;
+    } catch (e) {
+      if (e && e.code === 'declined') ui.toast('Download cancelled; no backup was saved.', 'error');
+      else ui.toast('Backup could not be downloaded: ' + errorText(e), 'error');
+      return false;
+    }
+  }
+
   function close() {
     root().hidden = true;
     document.body.style.overflow = '';
@@ -126,6 +154,16 @@ window.MP = window.MP || {};
       ? (undoInfo.length > 1 ? txLabel(undoInfo[0].tx) + ' for ' + undoInfo.length + ' students' : undoInfo[0].studentName + ': ' + txLabel(undoInfo[0].tx))
       : 'Nothing to undo in this class.';
 
+    let last = null;
+    try { last = await st.getLastBackup(); } catch (_) { /* treat as never */ }
+    const days = last ? Math.floor((Date.now() - new Date(last).getTime()) / 86400000) : null;
+    const reminder = days === null || days >= 7
+      ? h('div', { class: 'backup-reminder', role: 'status' },
+        h('span', null, h('b', null, days === null ? 'No backup has been downloaded on this device yet. ' : 'The last backup was ' + days + ' days ago. '),
+          'Download one now, so stars and cards are safe if the browser data is ever cleared.'),
+        h('button', { class: 'tbtn gold', onclick: function () { downloadBackup().then(function (ok) { if (ok) render(); }); } }, 'Download backup now'))
+      : null;
+
     const tabs = [['students', 'Students'], ['classes', 'Classes'], ['history', 'History'], ['settings', 'Settings'], ['data', 'Backup & Data']];
     const content = h('div');
     const panel = h('div', { class: 't-wrap' },
@@ -138,6 +176,7 @@ window.MP = window.MP || {};
       h('div', { class: 't-note' },
         'Data is stored only in this browser on this device (IndexedDB). It does not sync between devices and there is no cloud copy. Download a JSON backup regularly from “Backup & Data”.',
         s.settings.pin ? ' The PIN only hides the teacher tools on this screen; it is not real server-side security.' : ' No PIN is set, so anyone can open the teacher tools (you can set a PIN in Settings).'),
+      reminder,
       h('div', { class: 't-card', style: { marginTop: '14px' } },
         h('div', { class: 'undo-bar' }, undoBtn, h('span', null, h('b', null, 'Last action: '), undoText))),
       h('div', { class: 't-tabs', role: 'tablist' }, tabs.map(function (t) {
@@ -227,7 +266,7 @@ window.MP = window.MP || {};
       };
       return h('tr', null,
         h('td', null, cb),
-        h('td', null, h('b', null, s.name), nameCount[s.name.toLowerCase()] > 1 ? h('span', { class: 'warn-dup', title: 'Another student in this class has the same name' }, 'same name') : null),
+        h('td', null, MP.symbolEl(s.symbol, 'sym-small'), h('b', null, s.name), nameCount[s.name.toLowerCase()] > 1 ? h('span', { class: 'warn-dup', title: 'Another student in this class has the same name' }, 'same name') : null),
         h('td', { class: 'num' }, String(s.balance), s.balance >= cost ? ' ✦' : ''),
         h('td', { class: 'num' }, String(s.totalEarned)),
         h('td', { class: 'num' }, s.cardCount + '/40'),
@@ -284,6 +323,7 @@ window.MP = window.MP || {};
     const cls = classes.find(function (c) { return c.id === s.classId; });
     const owned = Object.values(await st.getOwned(sid)).sort(function (a, b) { return a.cardId.localeCompare(b.cardId); });
     const hist = await st.listTxs({ studentId: sid, limit: 60 });
+    const classmates = await st.listStudents(s.classId, { includeArchived: true });
 
     const nameIn = h('input', { class: 'input', value: s.name, maxlength: '60', id: 'edit-name', 'aria-label': 'Student name' });
     const moveSel = h('select', { class: 'select', id: 'move-class', 'aria-label': 'Move to class' }, classes.filter(function (c) { return !c.archived || c.id === s.classId; }).map(function (c) {
@@ -308,6 +348,16 @@ window.MP = window.MP || {};
         h('button', { class: 'tbtn', onclick: function () { m.close(); close(); app().go('#/student/' + sid); } }, 'Student screen')),
       h('h3', null, 'Print (A5)'),
       h('div', { class: 'btn-row' }, printBtn('filled', 'Filled album'), printBtn('blank', 'Blank album'), printBtn('cards-earned', 'Earned card sheets')),
+      h('h3', null, 'Picture'),
+      h('p', { style: { fontSize: '.92rem', color: '#5b507c' } }, 'Each child in the class has their own picture, so children who cannot read yet can find their tile. Faded pictures belong to other children in this class.'),
+      h('div', { class: 'symbol-grid' }, MP.SYMBOLS.map(function (sym) {
+        const owner = classmates.find(function (x) { return x.id !== s.id && x.symbol === sym.id; });
+        return h('button', {
+          type: 'button', title: owner ? sym.label + ' – ' + owner.name : sym.label, 'aria-label': sym.label + (owner ? ', taken by ' + owner.name : ''),
+          'aria-pressed': s.symbol === sym.id ? 'true' : 'false', disabled: owner ? true : null,
+          onclick: function () { if (s.symbol !== sym.id) run(function () { return st.setSymbol(sid, sym.id); }, 'Picture changed.', true); }
+        }, MP.symbolEl(sym.id));
+      })),
       h('h3', null, 'Edit name'),
       h('div', { class: 'row' }, h('div', { style: { flex: 1 } }, nameIn), h('button', { class: 'tbtn primary', onclick: function () { run(function () { return st.renameStudent(sid, nameIn.value); }, 'Name updated.', true); } }, 'Save')),
       h('h3', null, 'Change class'),
@@ -483,21 +533,6 @@ window.MP = window.MP || {};
     const classes = await st.listClasses({ includeArchived: true });
     const hasDemo = classes.some(function (c) { return c.isDemo; });
 
-    const downloadBackup = async function () {
-      try {
-        const b = await st.exportBackup();
-        const d = new Date();
-        const stamp = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0') + '_' + String(d.getHours()).padStart(2, '0') + String(d.getMinutes()).padStart(2, '0');
-        await ui.download('magic-picker-backup-' + stamp + '.json', JSON.stringify(b, null, 1));
-        ui.toast('Backup file downloaded.', 'ok');
-        return true;
-      } catch (e) {
-        if (e && e.code === 'declined') ui.toast('Download cancelled; no backup was saved.', 'error');
-        else ui.toast('Backup could not be downloaded: ' + errorText(e), 'error');
-        return false;
-      }
-    };
-
     const file = h('input', { type: 'file', accept: 'application/json,.json', class: 'input', id: 'restore-file', 'aria-label': 'Backup file' });
     const report = h('div');
     file.onchange = async function () {
@@ -542,7 +577,7 @@ window.MP = window.MP || {};
     el.appendChild(h('div', { class: 't-grid2' },
       h('div', { class: 't-card' }, h('h2', null, 'Download a backup (JSON)'),
         h('p', null, 'All classes, students, stars, cards, history and settings are saved in one file. To move to another device, restore this file there.'),
-        h('button', { class: 'tbtn primary', onclick: downloadBackup }, 'Download backup')),
+        h('button', { class: 'tbtn primary', onclick: function () { downloadBackup().then(function (ok) { if (ok) render(); }); } }, 'Download backup')),
       h('div', { class: 't-card' }, h('h2', null, 'Restore from a backup'),
         h('p', null, 'The file is checked first. A broken or incomplete backup does not change your current data. Restoring happens in one step: if anything fails, nothing changes.'),
         file, report),
@@ -572,5 +607,5 @@ window.MP = window.MP || {};
         }, 'Reset everything'))));
   }
 
-  MP.teacher = { open: open, close: close, render: render };
+  MP.teacher = { open: open, close: close, render: render, requireTeacher: requireTeacher };
 })();

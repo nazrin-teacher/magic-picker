@@ -12,6 +12,7 @@ window.MP = window.MP || {};
     try {
       await st.init();
       try { await st.applyRoster(MP.CLASS_ROSTER, MP.ROSTER_VERSION); } catch (e) { console.error('Class lists could not be loaded', e); }
+      try { await st.ensureSymbols(); } catch (e) { console.error('Picture symbols could not be assigned', e); }
       state.settings = await st.getSettings();
     } catch (e) {
       console.error(e);
@@ -133,6 +134,12 @@ window.MP = window.MP || {};
     }
   }
 
+  /* What the speech voice says: the given names only ("Hasan Tarık Ö." -> "Hasan Tarık"). */
+  function spokenName(name) {
+    const words = String(name).split(/\s+/).filter(function (w) { return w && !/\.$/.test(w); });
+    return words.length ? words.join(' ') : String(name);
+  }
+
   function backBtn(label, hash) {
     return h('button', { class: 'btn btn-pearl btn-small', onclick: function () { go(hash); } }, icon('back'), label);
   }
@@ -155,22 +162,70 @@ window.MP = window.MP || {};
   }
 
   /* ---------- class ---------- */
-  async function renderClass(tok, classId) {
+  async function renderClass(tok, classId, keepMode) {
     const cls = await st.getClass(classId);
     if (!cls) { go('#/'); return; }
     setClassChip(cls);
+    if (!keepMode) state.attendance = false;
+    const marking = !!state.attendance;
     const students = await st.listStudents(classId);
+    const away = new Set(await st.getAbsent(classId));
     const cost = state.settings.starsPerCard;
+
+    const hereLine = h('p', { class: 'screen-sub here-line' });
+    const updateHere = function () {
+      const n = students.filter(function (s) { return !away.has(s.id); }).length;
+      hereLine.textContent = away.size ? n + ' of ' + students.length + ' here today' : '';
+      hereLine.hidden = !away.size;
+    };
+    updateHere();
+
+    const attendBtn = students.length ? h('button', {
+      class: 'btn btn-small ' + (marking ? 'btn-teal' : 'btn-pearl'), 'aria-pressed': marking ? 'true' : 'false',
+      onclick: async function () {
+        if (!marking && !(await MP.teacher.requireTeacher())) return;
+        state.attendance = !marking;
+        renderClass(++renderTok, classId, true);
+      }
+    }, marking ? 'Done' : 'Who’s here today?') : null;
+
     const head = h('div', { class: 'screen-head' },
-      h('div', null, h('h1', { class: 'screen-title' }, cls.name), h('p', { class: 'screen-sub' }, students.length ? 'Tap your name, or let the magic pick!' : '')),
+      h('div', null, h('h1', { class: 'screen-title' }, cls.name),
+        h('p', { class: 'screen-sub' }, marking ? 'Tap the children who are away today. Tap again when they are back.' : (students.length ? 'Tap your name, or let the magic pick!' : '')),
+        hereLine),
       h('div', { class: 'class-actions' },
         backBtn('All classes', '#/'),
-        students.length ? h('button', { class: 'btn btn-gold btn-xl', onclick: function () { go('#/pick/' + classId); } }, icon('star'), 'Pick a Student') : null));
+        attendBtn,
+        students.length && !marking ? h('button', { class: 'btn btn-gold btn-xl', onclick: function () { go('#/pick/' + classId); } }, icon('star'), 'Pick a Student') : null));
+
+    function tileBottom(s) {
+      if (marking) return away.has(s.id) ? h('span', { class: 'away-chip' }, 'Away today') : h('span', { class: 'away-chip here' }, 'Here');
+      if (away.has(s.id)) return h('span', { class: 'away-chip' }, 'Away today');
+      return h('span', { class: 'star-badge' + (s.balance >= cost ? ' ready' : '') }, ui.starText(s.balance));
+    }
+
     const body = students.length
-      ? h('div', { class: 'student-grid' }, students.map(function (s) {
-        return h('button', { class: 'student-tile', onclick: function () { MP.sound.play('tap'); go('#/student/' + s.id); } },
-          h('span', { class: 'name' }, s.name),
-          h('span', { class: 'star-badge' + (s.balance >= cost ? ' ready' : '') }, ui.starText(s.balance)));
+      ? h('div', { class: 'student-grid' + (marking ? ' marking' : '') }, students.map(function (s) {
+        const bottom = h('span', { class: 'tile-bottom' }, tileBottom(s));
+        const tile = h('button', {
+          class: 'student-tile' + (away.has(s.id) ? ' away' : ''), 'aria-pressed': marking ? String(!away.has(s.id)) : null,
+          onclick: async function () {
+            if (!marking) { MP.sound.play('tap'); go('#/student/' + s.id); return; }
+            const nowAway = !away.has(s.id);
+            try {
+              await st.setAbsent(classId, s.id, nowAway);
+              if (nowAway) away.add(s.id); else away.delete(s.id);
+              MP.sound.play('tap');
+              tile.classList.toggle('away', nowAway);
+              tile.setAttribute('aria-pressed', String(!nowAway));
+              bottom.replaceChildren(tileBottom(s));
+              updateHere();
+            } catch (e) { ui.toast('Could not save who is here today.', 'error'); }
+          }
+        },
+          h('span', { class: 'tile-top' }, MP.symbolEl(s.symbol, 'sym-tile'), h('span', { class: 'name' }, s.name)),
+          bottom);
+        return tile;
       }))
       : h('div', { class: 'panel empty-state' },
         h('p', null, 'No students in ' + cls.name + ' yet.'),
@@ -277,8 +332,9 @@ window.MP = window.MP || {};
 
     const recent = Object.values(owned).sort(function (a, b) { return b.earnedAt.localeCompare(a.earnedAt); }).slice(0, 3);
     const left = h('div', { class: 'panel' },
-      h('h1', { class: 'hero-name' }, s.name),
-      h('p', { class: 'hero-class' }, 'Class ' + (cls ? cls.name : '')),
+      h('div', { class: 'hero-row' }, MP.symbolEl(s.symbol, 'sym-hero'), h('h1', { class: 'hero-name' }, s.name)),
+      h('div', { class: 'row hero-class' }, h('span', null, 'Class ' + (cls ? cls.name : '')),
+        state.settings.sound && MP.sound.canSpeak() ? h('button', { class: 'btn btn-pearl btn-small', onclick: function () { MP.sound.speak(spokenName(s.name)); } }, icon('soundOn'), 'Hear my name') : null),
       h('div', { class: 'balance' },
         h('div', { class: 'big' }, icon('star'), String(s.balance)),
         h('div', { class: 'label' }, s.balance === 1 ? 'star to spend' : 'stars to spend', h('small', null, 'Total stars earned: ' + s.totalEarned))),
@@ -314,9 +370,10 @@ window.MP = window.MP || {};
     const backFace = h('div', { class: 'face back' }, h('img', { src: MP.CARD_BACK, alt: '' }));
     const shuffleName = h('div', { class: 'shuffle-name', 'aria-hidden': 'true' });
     backFace.appendChild(shuffleName);
+    const symHolder = h('div', { class: 'pick-symbol' });
     const who = h('div', { class: 'who' });
     const tag = h('div', { class: 'tag' });
-    const front = h('div', { class: 'face front' }, who, tag);
+    const front = h('div', { class: 'face front' }, symHolder, who, tag);
     const flip = h('div', { class: 'flip' }, h('div', { class: 'glow' }), backFace, front);
     const live = h('div', { class: 'sr-only', 'aria-live': 'assertive', style: { position: 'absolute', left: '-9999px' } });
     const after = h('div', { class: 'stack', style: { marginTop: '16px', width: 'min(100%, 460px)' } });
@@ -329,11 +386,12 @@ window.MP = window.MP || {};
     const toggle = h('label', { class: 'toggle' }, toggleInput, h('span', { class: 'track' }), 'No repeats');
 
     function showRound(r) {
+      const awayText = r.away ? ' · ' + r.away + ' away today' : '';
       if (r.noRepeats) {
-        info.textContent = r.roundComplete ? 'Everyone has had a turn!' : 'Picked ' + r.pickedCount + ' of ' + r.total + ' this round';
+        info.textContent = (r.roundComplete ? 'Everyone here has had a turn!' : 'Picked ' + r.pickedCount + ' of ' + r.total + (r.away ? ' here today' : ' this round')) + awayText;
         bar.replaceChildren(h('div', { class: 'round-bar' }, h('div', { style: { width: (r.total ? (r.pickedCount / r.total) * 100 : 0) + '%' } })));
       } else {
-        info.textContent = 'Anyone can be picked, even twice.';
+        info.textContent = 'Anyone here can be picked, even twice.' + awayText;
         bar.replaceChildren();
       }
       newRoundBtn.hidden = !r.noRepeats;
@@ -352,7 +410,7 @@ window.MP = window.MP || {};
         flip.classList.remove('flipped');
         after.replaceChildren();
         showRound(await st.getRound(classId));
-        ui.toast('New round! Everyone can be picked again.', 'ok');
+        ui.toast('New round! Everyone here can be picked again.', 'ok');
       } catch (e) { ui.toast('Could not start a new round.', 'error'); }
     });
 
@@ -368,7 +426,8 @@ window.MP = window.MP || {};
       try {
         if (err) {
           flip.classList.add('flipped');
-          who.textContent = err.code === 'ROUND_COMPLETE' ? 'Everyone has had a turn!' : (err.code === 'NO_STUDENTS' ? 'No students yet' : 'Try again');
+          symHolder.replaceChildren();
+          who.textContent = err.code === 'ROUND_COMPLETE' ? 'Everyone has had a turn!' : (err.code === 'NO_STUDENTS' ? 'No students yet' : err.code === 'NO_ONE_HERE' ? 'Everyone is away today' : 'Try again');
           tag.textContent = err.code === 'ROUND_COMPLETE' ? 'Tap New Round to start again.' : '';
           MP.sound.play('error');
           showRound(await st.getRound(classId));
@@ -387,15 +446,21 @@ window.MP = window.MP || {};
           shuffleName.textContent = '';
           flip.classList.remove('shaking');
         }
+        symHolder.replaceChildren(MP.symbolEl(picked.symbol, 'sym-pick'));
         who.textContent = picked.name;
         tag.textContent = 'It’s your turn!';
         flip.classList.add('flipped');
         live.textContent = picked.name + ' is picked';
         MP.sound.play('pick');
-        showRound(result.noRepeats ? { noRepeats: true, pickedCount: result.pickedCount, total: result.total, roundComplete: result.roundComplete } : { noRepeats: false });
+        const chosen = picked;
+        setTimeout(function () { if (document.body.contains(flip)) MP.sound.speak(spokenName(chosen.name)); }, reduce() ? 150 : 650);
+        showRound(result.noRepeats
+          ? { noRepeats: true, pickedCount: result.pickedCount, total: result.total, away: result.away, roundComplete: result.roundComplete }
+          : { noRepeats: false, away: result.away });
         after.replaceChildren(
-          h('button', { class: 'btn btn-teal btn-block', onclick: function () { go('#/student/' + picked.id); } }, 'Open ' + picked.name + '’s page'),
-          teacherStrip(picked.id));
+          h('button', { class: 'btn btn-teal btn-block', onclick: function () { go('#/student/' + chosen.id); } }, 'Open ' + chosen.name + '’s page'),
+          MP.sound.canSpeak() && state.settings.sound ? h('button', { class: 'btn btn-pearl btn-block', onclick: function () { MP.sound.speak(spokenName(chosen.name)); } }, icon('soundOn'), 'Say the name again') : null,
+          teacherStrip(chosen.id));
       } finally {
         busy = false; pickBtn.disabled = false;
       }
@@ -621,7 +686,7 @@ window.MP = window.MP || {};
       return h('div', { class: 'page cover-page' },
         h('div', { class: 'cover-title' }, 'My Magic Collection'),
         h('img', { class: 'cover-emblem', src: MP.CARD_BACK, alt: '' }),
-        h('div', { class: 'cover-who' }, h('div', { class: 'cover-name' }, s.name), h('div', { class: 'cover-class' }, 'Class ' + ctx.className)),
+        h('div', { class: 'cover-who' }, MP.symbolEl(s.symbol, 'sym-cover'), h('div', { class: 'cover-name' }, s.name), h('div', { class: 'cover-class' }, 'Class ' + ctx.className)),
         h('div', { class: 'cover-progress' },
           h('div', { class: 'line' }, h('span', null, 'Adventure'), h('span', null, counts.adventure + ' / 20')),
           h('div', { class: 'line' }, h('span', null, 'Wonder'), h('span', null, counts.wonder + ' / 20')),

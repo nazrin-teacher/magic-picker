@@ -257,7 +257,7 @@ window.MP = window.MP || {};
   }
 
   function deleteClass(id) {
-    return run(['classes', 'students', 'owned', 'txs', 'rounds'], 'readwrite', async function (t) {
+    return run(['meta', 'classes', 'students', 'owned', 'txs', 'rounds'], 'readwrite', async function (t) {
       const c = await req(S(t, 'classes').get(id));
       if (!c) throw StoreError('NO_CLASS');
       const students = await req(S(t, 'students').index('classId').getAll(id));
@@ -268,6 +268,7 @@ window.MP = window.MP || {};
       const leftover = await req(S(t, 'txs').index('classId').getAllKeys(id));
       for (const k of leftover) await req(S(t, 'txs').delete(k));
       await req(S(t, 'rounds').delete(id));
+      await req(S(t, 'meta').delete('absent:' + id));
       await req(S(t, 'classes').delete(id));
       return { removedStudents: students.length };
     });
@@ -293,6 +294,85 @@ window.MP = window.MP || {};
     return run(['students'], 'readonly', function (t) { return req(S(t, 'students').get(id)); });
   }
 
+  /* ---------- picture symbols (js/symbols.js) ---------- */
+  /* Every student in a class gets their own symbol. Existing symbols are kept; clashes and gaps are filled. */
+  async function assignSymbolsIn(t, classId) {
+    if (!MP.SYMBOL_IDS) return;
+    const list = (await req(S(t, 'students').index('classId').getAll(classId)))
+      .sort(function (a, b) { return a.createdAt.localeCompare(b.createdAt); });
+    const used = new Set(), needs = [];
+    list.forEach(function (s) {
+      if (s.symbol && MP.SYMBOL_IDS.indexOf(s.symbol) >= 0 && !used.has(s.symbol)) used.add(s.symbol);
+      else needs.push(s);
+    });
+    for (const s of needs) {
+      const next = MP.SYMBOL_IDS.find(function (id) { return !used.has(id); }) || null; // over 48 children: no symbol
+      if (next) used.add(next);
+      if (s.symbol === next) continue;
+      s.symbol = next;
+      await req(S(t, 'students').put(s));
+    }
+  }
+
+  function ensureSymbols() {
+    return run(['students'], 'readwrite', async function (t) {
+      const all = await req(S(t, 'students').getAll());
+      const classIds = Array.from(new Set(all.map(function (s) { return s.classId; })));
+      for (const id of classIds) await assignSymbolsIn(t, id);
+    });
+  }
+
+  function setSymbol(studentId, symbol) {
+    return run(['students'], 'readwrite', async function (t) {
+      if (!MP.SYMBOL_IDS || MP.SYMBOL_IDS.indexOf(symbol) < 0) throw StoreError('BAD_VALUE', 'Unknown picture.');
+      const s = await getStudentIn(t, studentId);
+      const others = await req(S(t, 'students').index('classId').getAll(s.classId));
+      const owner = others.find(function (x) { return x.id !== s.id && x.symbol === symbol; });
+      if (owner) throw StoreError('SYMBOL_TAKEN', owner.name + ' already has this picture.');
+      s.symbol = symbol;
+      await req(S(t, 'students').put(s));
+      return s;
+    });
+  }
+
+  /* ---------- who is here today ---------- */
+  /* Absences are kept per class for one calendar day only; the next day everyone counts as here again. */
+  function dayKey(d) {
+    d = d || new Date();
+    return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+  }
+
+  async function absentIn(t, classId, day) {
+    const r = await req(S(t, 'meta').get('absent:' + classId));
+    return new Set(r && r.date === (day || dayKey()) ? r.ids : []);
+  }
+
+  function getAbsent(classId, day) {
+    return run(['meta'], 'readonly', async function (t) { return Array.from(await absentIn(t, classId, day)); });
+  }
+
+  function setAbsent(classId, studentId, absent, day) {
+    return run(['meta'], 'readwrite', async function (t) {
+      const today = day || dayKey();
+      const set = await absentIn(t, classId, today);
+      if (absent) set.add(studentId); else set.delete(studentId);
+      await req(S(t, 'meta').put({ key: 'absent:' + classId, date: today, ids: Array.from(set) }));
+      return Array.from(set);
+    });
+  }
+
+  /* ---------- backup reminder ---------- */
+  function markBackup() {
+    return run(['meta'], 'readwrite', function (t) { return req(S(t, 'meta').put({ key: 'lastBackup', at: now() })); });
+  }
+
+  function getLastBackup() {
+    return run(['meta'], 'readonly', async function (t) {
+      const r = await req(S(t, 'meta').get('lastBackup'));
+      return r ? r.at : null;
+    });
+  }
+
   function addStudents(classId, names, opts) {
     const clean = (names || []).map(cleanName).filter(Boolean);
     return run(['classes', 'students'], 'readwrite', async function (t) {
@@ -308,6 +388,7 @@ window.MP = window.MP || {};
         await req(S(t, 'students').add(s));
         created.push(s);
       }
+      await assignSymbolsIn(t, classId);
       return created;
     });
   }
@@ -347,7 +428,8 @@ window.MP = window.MP || {};
       const txs = await req(S(t, 'txs').index('studentId').getAll(id));
       for (const x of txs) { x.classId = newClassId; await req(S(t, 'txs').put(x)); }
       await req(S(t, 'txs').add({ id: uuid(), type: 'move', studentId: id, classId: newClassId, fromClassId: fromId, seq: await nextSeq(t), createdAt: now(), undone: false }));
-      return s;
+      await assignSymbolsIn(t, newClassId);
+      return getStudentIn(t, id);
     });
   }
 
@@ -529,13 +611,23 @@ window.MP = window.MP || {};
   }
 
   /* ---------- Pick a Student ---------- */
-  function getRound(classId) {
-    return run(['rounds', 'students'], 'readonly', async function (t) {
+  /* Active students split into those here today and those away today. */
+  async function presentIn(t, classId, day) {
+    const active = (await req(S(t, 'students').index('classId').getAll(classId))).filter(function (s) { return !s.archived; });
+    const absent = await absentIn(t, classId, day);
+    return { active: active, present: active.filter(function (s) { return !absent.has(s.id); }) };
+  }
+
+  function getRound(classId, opts) {
+    return run(['meta', 'rounds', 'students'], 'readonly', async function (t) {
       const r = (await req(S(t, 'rounds').get(classId))) || { classId: classId, picked: [], noRepeats: true };
-      const active = (await req(S(t, 'students').index('classId').getAll(classId))).filter(function (s) { return !s.archived; });
-      const ids = new Set(active.map(function (s) { return s.id; }));
-      const picked = r.picked.filter(function (id) { return ids.has(id); });
-      return { noRepeats: r.noRepeats !== false, pickedCount: picked.length, total: active.length, roundComplete: active.length > 0 && picked.length >= active.length };
+      const p = await presentIn(t, classId, opts && opts.day);
+      const picked = new Set(r.picked || []);
+      const pickedCount = p.present.filter(function (s) { return picked.has(s.id); }).length;
+      return {
+        noRepeats: r.noRepeats !== false, pickedCount: pickedCount, total: p.present.length, away: p.active.length - p.present.length,
+        roundComplete: p.present.length > 0 && pickedCount >= p.present.length
+      };
     });
   }
 
@@ -557,29 +649,32 @@ window.MP = window.MP || {};
     });
   }
 
-  /* Picking never changes stars or cards. */
-  function pickStudent(classId) {
-    return run(['rounds', 'students'], 'readwrite', async function (t) {
+  /* Picking never changes stars or cards, and never picks a child marked away today. */
+  function pickStudent(classId, opts) {
+    return run(['meta', 'rounds', 'students'], 'readwrite', async function (t) {
       const r = (await req(S(t, 'rounds').get(classId))) || { classId: classId, picked: [], noRepeats: true };
-      const active = (await req(S(t, 'students').index('classId').getAll(classId))).filter(function (s) { return !s.archived; });
-      if (!active.length) throw StoreError('NO_STUDENTS', 'There are no students in this class yet.');
-      const ids = new Set(active.map(function (s) { return s.id; }));
+      const p = await presentIn(t, classId, opts && opts.day);
+      if (!p.active.length) throw StoreError('NO_STUDENTS', 'There are no students in this class yet.');
+      if (!p.present.length) throw StoreError('NO_ONE_HERE', 'Everyone is marked away today.');
+      const ids = new Set(p.active.map(function (s) { return s.id; }));
       r.picked = (r.picked || []).filter(function (id) { return ids.has(id); });
       const noRepeats = r.noRepeats !== false;
-      let pool = active;
+      const done = new Set(r.picked);
+      let pool = p.present;
       if (noRepeats) {
-        const done = new Set(r.picked);
-        pool = active.filter(function (s) { return !done.has(s.id); });
+        pool = p.present.filter(function (s) { return !done.has(s.id); });
         if (!pool.length) throw StoreError('ROUND_COMPLETE', 'Everyone has had a turn.');
       }
       const chosen = pool[randInt(pool.length)];
-      if (noRepeats) r.picked.push(chosen.id);
+      if (noRepeats) { r.picked.push(chosen.id); done.add(chosen.id); }
       r.lastPickedId = chosen.id;
       await req(S(t, 'rounds').put(r));
+      const pickedCount = p.present.filter(function (s) { return done.has(s.id); }).length;
       return {
-        student: chosen, noRepeats: noRepeats, pickedCount: noRepeats ? r.picked.length : 0, total: active.length,
-        roundComplete: noRepeats && r.picked.length >= active.length,
-        others: active.map(function (s) { return s.name; })
+        student: chosen, noRepeats: noRepeats, pickedCount: noRepeats ? pickedCount : 0, total: p.present.length,
+        away: p.active.length - p.present.length,
+        roundComplete: noRepeats && pickedCount >= p.present.length,
+        others: p.present.map(function (s) { return s.name; })
       };
     });
   }
@@ -703,6 +798,7 @@ window.MP = window.MP || {};
           }));
           added++;
         }
+        await assignSymbolsIn(t, c.id);
       }
       await req(S(t, 'meta').put({ key: 'roster', version: version, appliedAt: now(), added: added }));
       return { added: added };
@@ -757,6 +853,7 @@ window.MP = window.MP || {};
     init, getSettings, updateSettings,
     listClasses, getClass, createClass, renameClass, setClassArchived, deleteClass,
     listStudents, getStudent, addStudents, renameStudent, setStudentArchived, moveStudent, resetStudent, deleteStudent,
+    ensureSymbols, setSymbol, dayKey, getAbsent, setAbsent, markBackup, getLastBackup,
     awardStars, buyCard, surpriseCard, getOwned,
     peekUndo, undoLast, listTxs,
     getRound, setNoRepeats, newRound, pickStudent,

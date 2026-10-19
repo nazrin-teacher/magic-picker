@@ -17,6 +17,15 @@ Class → tap a name or **Pick a Student** → the teacher gives stars → **Cho
 - Teacher tools: **Teacher** at the top right. While the panel is unlocked, `+1 +2 +3 / Other` star buttons appear on the student screens; **Lock** hides them.
 - The class lists are already built in: every class shows its students the first time the site opens. Add, rename or archive students under Teacher → Students. To try the app first, use Backup & Data → **Load demo data** (a separate “DEMO” class that one click removes).
 
+## Made for children who cannot read yet
+
+- **Pictures:** every child in a class has their own coloured shape (red star, blue moon …) on their tile, their page, the pick card and the album cover. Change it under Teacher → Details / Edit → Picture.
+- **Names read aloud:** when a child is picked, the name is spoken (given names only, with a Turkish voice when the device has one). The student page has a “Hear my name” button. Sound must be on.
+
+## Who's here today
+
+On the class screen tap **Who's here today?**, then tap the children who are away; tap **Done**. Away children are faded and are never picked that day. The next day everyone counts as here again automatically. With a PIN set, this asks for the PIN.
+
 ## Rules
 
 - Default: 5 stars = 1 card (change it in Settings; the past is not recalculated).
@@ -42,7 +51,7 @@ Card sheets are always A5; printed cards are the same size as the album slots: 5
 
 ## Data and safety
 
-- Data stays only in this browser on this device; it does **not sync** between devices and there is no cloud copy. Download a backup regularly from Backup & Data → **Download backup (JSON)**.
+- Data stays only in this browser on this device; it does **not sync** between devices and there is no cloud copy. Download a backup regularly from Backup & Data → **Download backup (JSON)**. The teacher panel reminds you when no backup has been made for 7 days.
 - Restoring checks the file first; a broken file does not change the current data.
 - The PIN only hides the teacher tools on this screen; it is **not real authentication** and it does not encrypt the data.
 - The 2025–2026 class lists are built in (`js/roster.js`) as first name + surname initial only. On each device they are loaded once into classes that are still empty; names you add, edit or delete afterwards are never overwritten.

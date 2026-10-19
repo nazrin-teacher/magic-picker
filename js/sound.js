@@ -46,7 +46,26 @@ window.MP = window.MP || {};
     error: function () { tone(220, 0, 0.18, 'sine', 0.1); }
   };
 
+  /* Reads a child's name aloud with a Turkish voice when the device has one. Never blocks anything. */
+  function canSpeak() { return !!(window.speechSynthesis && window.SpeechSynthesisUtterance); }
+  function speak(text) {
+    if (!enabled || !text || !canSpeak()) return false;
+    try {
+      const u = new SpeechSynthesisUtterance(text);
+      u.lang = 'tr-TR';
+      const voice = speechSynthesis.getVoices().find(function (v) { return /^tr/i.test(v.lang); });
+      if (voice) u.voice = voice;
+      u.rate = 0.9;
+      speechSynthesis.cancel();
+      speechSynthesis.speak(u);
+      return true;
+    } catch (_) { return false; }
+  }
+  if (canSpeak()) { try { speechSynthesis.getVoices(); } catch (_) { /* voices load lazily */ } }
+
   MP.sound = {
+    speak: speak,
+    canSpeak: canSpeak,
     play: function (name) { if (enabled && sounds[name]) { try { sounds[name](); } catch (_) { /* ignore */ } } },
     setEnabled: function (on) { enabled = !!on; },
     isEnabled: function () { return enabled; }

@@ -306,6 +306,63 @@
     return '6 demo students created and removed';
   });
 
+  await test('Children marked away today are never picked; the next day everyone is back', async function () {
+    const c = await st.createClass('AwayTest');
+    const list = await st.addStudents(c.id, ['W1', 'W2', 'W3', 'W4', 'W5']);
+    const today = st.dayKey(new Date(2026, 9, 20)), tomorrow = st.dayKey(new Date(2026, 9, 21));
+    await st.setAbsent(c.id, list[0].id, true, today);
+    await st.setAbsent(c.id, list[1].id, true, today);
+    await st.setNoRepeats(c.id, true);
+    const seen = new Set();
+    for (let i = 0; i < 3; i++) {
+      const r = await st.pickStudent(c.id, { day: today });
+      expect(r.student.id !== list[0].id && r.student.id !== list[1].id, 'picked an away child');
+      expect(r.total === 3 && r.away === 2, 'counts ' + r.total + '/' + r.away);
+      seen.add(r.student.id);
+    }
+    expect(seen.size === 3, 'repeat among present children');
+    await expectFail(st.pickStudent(c.id, { day: today }), 'ROUND_COMPLETE');
+    const round = await st.getRound(c.id, { day: today });
+    expect(round.roundComplete && round.total === 3 && round.away === 2, 'round info');
+    // back the next day: the two who were away can now be picked
+    const next = await st.pickStudent(c.id, { day: tomorrow });
+    expect(next.away === 0 && next.total === 5, 'next day counts');
+    expect(next.student.id === list[0].id || next.student.id === list[1].id, 'next day should pick a child not yet picked');
+    for (const s of list) await st.setAbsent(c.id, s.id, true, today);
+    await expectFail(st.pickStudent(c.id, { day: today }), 'NO_ONE_HERE');
+    return '2 away: only the other 3 picked; next day all 5 count again';
+  });
+
+  await test('Every child in a class gets a different picture; a taken picture cannot be reused', async function () {
+    const c = await st.createClass('SymbolTest');
+    const list = await st.addStudents(c.id, Array.from({ length: 20 }, function (_, i) { return 'S' + (i + 1); }));
+    const fresh = await st.listStudents(c.id);
+    const symbols = fresh.map(function (s) { return s.symbol; });
+    expect(symbols.every(Boolean), 'missing picture');
+    expect(new Set(symbols).size === 20, 'pictures repeat');
+    const taken = fresh.find(function (s) { return s.id !== list[0].id; }).symbol;
+    await expectFail(st.setSymbol(list[0].id, taken), 'SYMBOL_TAKEN');
+    const free = MP.SYMBOL_IDS.find(function (id) { return symbols.indexOf(id) < 0; });
+    await st.setSymbol(list[0].id, free);
+    expect((await st.getStudent(list[0].id)).symbol === free, 'picture not changed');
+    // moving into a class where the picture is taken gives the child a free one
+    const other = await st.createClass('SymbolTest2');
+    const o = (await st.addStudents(other.id, ['Mover']))[0];
+    await st.setSymbol(o.id, free === MP.SYMBOL_IDS[0] ? MP.SYMBOL_IDS[1] : MP.SYMBOL_IDS[0]);
+    await st.moveStudent(o.id, c.id);
+    const after = (await st.listStudents(c.id)).map(function (s) { return s.symbol; });
+    expect(new Set(after).size === 21, 'clash after move');
+    return '20 different pictures; taken one refused; no clash after a move';
+  });
+
+  await test('Backup reminder date is stored when a backup is made', async function () {
+    expect((await st.getLastBackup()) === null, 'should start empty');
+    await st.markBackup();
+    const at = await st.getLastBackup();
+    expect(at && Date.now() - new Date(at).getTime() < 60000, 'date ' + at);
+    return 'last backup ' + at.slice(0, 16);
+  });
+
   await test('Built-in class lists load once, only into empty classes', async function () {
     const total = Object.values(MP.CLASS_ROSTER).reduce(function (n, l) { return n + l.length; }, 0);
     const fresh = async function () {
