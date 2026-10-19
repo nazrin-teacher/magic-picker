@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Magic Picker Tests</title>
+<style>
+  body { font: 15px/1.5 system-ui, sans-serif; margin: 24px; background: #faf7f0; color: #221a3d; }
+  h1 { font-size: 20px; }
+  .pass { color: #0a7a43; } .fail { color: #b3122e; font-weight: 600; }
+  li { margin: 4px 0; }
+  #summary { font-weight: 700; font-size: 18px; margin: 12px 0; }
+  .note { color: #5a5172; }
+</style>
+</head>
+<body>
+<h1>Magic Picker – data tests</h1>
+<p class="note">Runs against a separate database (<code>magic-picker-test</code>); real classroom data is never touched.</p>
+<div id="summary">Running…</div>
+<ol id="out"></ol>
+<script src="js/cards.js"></script>
+<script src="js/store.js"></script>
+<script src="js/tests.js"></script>
+</body>
+</html>

@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="description" content="Magic Picker – classroom student picker and star-and-card collection for young learners.">
+<title>Magic Picker</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<!-- Optional web fonts; without internet the app falls back to built-in rounded / serif fonts. -->
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cinzel+Decorative:wght@700;900&family=Fredoka:wght@400;500;600;700&display=swap">
+<link rel="stylesheet" href="css/app.css?v=4">
+<link rel="stylesheet" href="css/print.css?v=4">
+<link rel="preload" as="image" href="assets/stage.jpg">
+</head>
+<body>
+<div class="bg" aria-hidden="true"></div>
+
+<header class="topbar">
+  <button class="brand" type="button" aria-label="Magic Picker – back to classes">Magic Picker</button>
+  <div class="topbar-right">
+    <span id="classChip" class="class-chip" hidden></span>
+    <button id="soundBtn" class="tb-btn" type="button" aria-pressed="true">Sound on</button>
+    <button id="lockBtn" class="tb-btn" type="button" hidden>Lock</button>
+    <button id="teacherBtn" class="tb-btn" type="button">Teacher</button>
+  </div>
+</header>
+
+<main id="screen" class="screen" tabindex="-1">
+  <noscript><div class="panel">Magic Picker needs JavaScript.</div></noscript>
+</main>
+
+<div id="teacher" class="teacher" hidden></div>
+<div id="modalRoot"></div>
+<div id="toasts" class="toasts" aria-live="polite"></div>
+<div id="print-root"></div>
+
+<script src="js/cards.js?v=4"></script>
+<script src="js/store.js?v=4"></script>
+<script src="js/ui.js?v=4"></script>
+<script src="js/sound.js?v=4"></script>
+<script src="js/print.js?v=4"></script>
+<script src="js/teacher.js?v=4"></script>
+<script src="js/app.js?v=4"></script>
+</body>
+</html>

@@ -1,0 +1,64 @@
+/* A5 printable album + card sheets. Every size is in millimetres so print output is exact. */
+.print-pages { display: flex; flex-direction: column; align-items: center; gap: 10mm; padding: 10mm 0 24mm; }
+.ppage {
+  width: 148mm; height: 209.6mm; padding: 10mm; background: #fff; color: #241a4c; overflow: hidden; position: relative;
+  box-shadow: 0 6px 26px rgba(0, 0, 0, .45); font-family: var(--font);
+  -webkit-print-color-adjust: exact; print-color-adjust: exact;
+}
+.ppage-inner { width: 128mm; height: 189.6mm; position: relative; display: flex; flex-direction: column; }
+
+/* cover */
+.p-cover .ppage-inner { align-items: center; justify-content: space-between; text-align: center; padding: 10mm 6mm; border: .7mm solid #d2a447; border-radius: 4mm; outline: .3mm solid #d2a447; outline-offset: -2mm; }
+.pc-title { font-family: var(--display); font-weight: 900; font-size: 25pt; line-height: 1.1; color: #2c1d70; }
+.pc-emblem { width: 38mm; height: auto; border-radius: 3.4mm / 2.4mm; }
+.pc-name { font-size: 22pt; font-weight: 700; border: .6mm solid #d2a447; border-radius: 3mm; padding: 2.5mm 7mm; max-width: 110mm; word-break: break-word; }
+.pc-class { font-size: 14pt; color: #5b507c; margin-top: -4mm; }
+.pc-progress { width: 90mm; font-size: 13pt; }
+.pc-line { display: flex; justify-content: space-between; padding: 1.8mm 0; border-bottom: .3mm solid #e2d2a8; }
+.pc-line:last-child { border-bottom: 0; font-weight: 700; }
+
+/* album slot page: 2 x 2 slots; frame 61 x 51.5 mm (border-box) leaves a 57 x 47.5 mm card window, same as printed cards */
+.p-slots .ppage-inner { justify-content: space-between; }
+.ps-head { display: flex; justify-content: space-between; align-items: baseline; border-bottom: .4mm solid #d2a447; padding-bottom: 2mm; height: 12mm; }
+.ps-col { font-family: var(--display); font-weight: 900; font-size: 17pt; color: #2c1d70; }
+.ps-num { font-size: 10pt; color: #5b507c; font-weight: 600; }
+.ps-grid { display: grid; grid-template-columns: 61mm 61mm; column-gap: 6mm; row-gap: 12mm; justify-content: center; }
+.ps-slot { display: flex; flex-direction: column; align-items: center; gap: 1.5mm; }
+.ps-frame { width: 61mm; height: 51.5mm; padding: 1.5mm; border: .5mm dashed #b8964f; border-radius: 2.5mm; display: flex; }
+.ps-slot.has .ps-frame { border-style: solid; border-color: #d2a447; background: #fbf4e2; }
+.ps-frame img { width: 57mm; height: 47.5mm; object-fit: cover; border-radius: 1.2mm; }
+.ps-label { font-size: 10pt; font-weight: 700; color: #5b507c; height: 4.5mm; }
+.ps-foot { text-align: center; font-size: 9pt; color: #8a83a0; height: 5mm; }
+
+/* back cover */
+.p-back .ppage-inner { align-items: center; justify-content: center; gap: 8mm; }
+.p-back img { width: 62mm; height: auto; border-radius: 5.6mm / 3.9mm; }
+.pb-title { font-family: var(--display); font-weight: 900; font-size: 16pt; color: #2c1d70; }
+
+/* A4 booklet sheet: two A5 pages side by side (297 x 210 mm), fold line in the middle */
+.print-pages.booklet { overflow-x: auto; align-items: safe center; }
+.psheet { width: 297mm; height: 209.6mm; display: flex; justify-content: center; gap: 1mm; background: #fff; position: relative; flex: none; box-shadow: 0 6px 26px rgba(0, 0, 0, .45); }
+.psheet .ppage { box-shadow: none; }
+.psheet::before, .psheet::after { content: ""; position: absolute; left: 50%; width: 0; height: 5mm; border-left: .25mm dashed #b9b2c9; }
+.psheet::before { top: 0; }
+.psheet::after { bottom: 0; }
+
+/* card sheets: 2 x 3 cards, 57 x 47.5 mm each */
+.pk-head { display: flex; justify-content: space-between; font-size: 9pt; color: #5b507c; height: 8mm; align-items: center; border-bottom: .3mm solid #e2d2a8; }
+.pk-grid { display: grid; grid-template-columns: 61mm 61mm; column-gap: 6mm; row-gap: 5mm; justify-content: center; margin-top: 6mm; }
+.pk-cell { display: flex; flex-direction: column; align-items: center; gap: 1mm; }
+.pk-cut { outline: .25mm dashed #8d8d8d; outline-offset: 0; width: 57mm; height: 47.5mm; }
+.pk-cut img { width: 57mm; height: 47.5mm; object-fit: cover; }
+.pk-label { font-size: 7.5pt; color: #8a83a0; height: 4mm; }
+
+@media print {
+  @page { size: 148mm 210mm; margin: 0; }
+  html, body { background: #fff !important; height: auto; overflow: visible !important; }
+  .bg, .topbar, #screen, #teacher, #modalRoot, #toasts, .print-toolbar { display: none !important; }
+  .print-pages { display: block; padding: 0; gap: 0; }
+  .ppage { box-shadow: none; margin: 0; break-after: page; page-break-after: always; break-inside: avoid; }
+  .ppage:last-child { break-after: auto; page-break-after: auto; }
+  .psheet { box-shadow: none; margin: 0; break-after: page; page-break-after: always; break-inside: avoid; }
+  .psheet:last-child { break-after: auto; page-break-after: auto; }
+  .psheet .ppage { break-after: auto; page-break-after: auto; }
+}
