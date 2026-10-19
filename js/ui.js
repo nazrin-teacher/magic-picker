@@ -89,18 +89,18 @@ window.MP = window.MP || {};
   function confirmDialog(o) {
     return new Promise(function (resolve) {
       let done = false;
-      const okBtn = h('button', { class: 'tbtn ' + (o.danger ? 'danger solid' : 'primary'), type: 'button' }, o.okText || 'Tamam');
-      const cancel = h('button', { class: 'tbtn', type: 'button' }, o.cancelText || 'Vazgeç');
+      const okBtn = h('button', { class: 'tbtn ' + (o.danger ? 'danger solid' : 'primary'), type: 'button' }, o.okText || 'OK');
+      const cancel = h('button', { class: 'tbtn', type: 'button' }, o.cancelText || 'Cancel');
       let input = null;
       if (o.typeToConfirm) {
-        input = h('input', { class: 'input', type: 'text', autocomplete: 'off', 'aria-label': 'Onay metni' });
+        input = h('input', { class: 'input', type: 'text', autocomplete: 'off', 'aria-label': 'Confirmation text' });
         okBtn.disabled = true;
         input.addEventListener('input', function () { okBtn.disabled = input.value.trim() !== o.typeToConfirm; });
       }
       const body = h('div', null,
         h('h2', null, o.title),
         (Array.isArray(o.message) ? o.message : [o.message]).map(function (m) { return h('p', null, m); }),
-        o.typeToConfirm ? h('div', { class: 'field' }, h('label', null, 'Onaylamak için ', h('b', null, o.typeToConfirm), ' yazın:'), input) : null,
+        o.typeToConfirm ? h('div', { class: 'field' }, h('label', null, 'Type ', h('b', null, o.typeToConfirm), ' to confirm:'), input) : null,
         h('div', { class: 'actions' }, cancel, okBtn));
       const m = modal(body, { onClose: function () { if (!done) { done = true; resolve(false); } } });
       cancel.onclick = function () { m.close(); };
@@ -122,8 +122,8 @@ window.MP = window.MP || {};
   function fmtDate(iso) {
     try { return new Date(iso).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' }); } catch (_) { return iso; }
   }
-  function fmtDateTimeTR(iso) {
-    try { return new Date(iso).toLocaleString('tr-TR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }); } catch (_) { return iso; }
+  function fmtDateTime(iso) {
+    try { return new Date(iso).toLocaleString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }); } catch (_) { return iso; }
   }
 
   /* True when the page runs inside the claude.ai artifact viewer (published web version). */
@@ -181,5 +181,5 @@ window.MP = window.MP || {};
     setTimeout(function () { b.remove(); }, 1600);
   }
 
-  MP.ui = { hosted, h, icon, ICONS, starText, toast, modal, closeAllModals, confirmDialog, once, fmtDate, fmtDateTimeTR, download, cardFrame, floatStars, burst };
+  MP.ui = { hosted, h, icon, ICONS, starText, toast, modal, closeAllModals, confirmDialog, once, fmtDate, fmtDateTime, download, cardFrame, floatStars, burst };
 })();

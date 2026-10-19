@@ -11,10 +11,10 @@ window.MP = window.MP || {};
 (function () {
   const ui = MP.ui, h = ui.h, st = MP.store;
   const KINDS = {
-    'filled': 'Dolu albüm',
-    'blank': 'Boş albüm',
-    'cards-earned': 'Kazanılan kartlar (kesip yapıştırmak için)',
-    'cards-all': 'Tüm 40 kart'
+    'filled': 'Filled album',
+    'blank': 'Blank album',
+    'cards-earned': 'Earned cards (to cut out and stick)',
+    'cards-all': 'All 40 cards'
   };
 
   function page(cls, children) {
@@ -122,7 +122,7 @@ window.MP = window.MP || {};
       const c = await st.getClass(id);
       if (!c) { MP.app.go('#/'); return; }
       students = await st.listStudents(c.id);
-      title = c.name + ' sınıfı – ' + students.length + ' öğrenci';
+      title = 'Class ' + c.name + ' – ' + students.length + (students.length === 1 ? ' student' : ' students');
       backHash = '#/class/' + c.id;
       if (kind === 'cards-all') kind = 'filled';
     } else { MP.app.go('#/'); return; }
@@ -147,38 +147,38 @@ window.MP = window.MP || {};
       }
     }
     if (kind === 'cards-all') { const sh = cardSheets(MP.CARDS, 'Magic Picker cards'); pageCount += sh.length; nodes.push.apply(nodes, sh); }
-    if (!nodes.length) emptyMsg = kind === 'cards-earned' ? 'Henüz kazanılmış kart yok.' : 'Bu sınıfta öğrenci yok.';
+    if (!nodes.length) emptyMsg = kind === 'cards-earned' ? 'No cards earned yet.' : 'There are no students in this class.';
 
     const go = function (k, layout) { MP.app.go('#/print/' + scope + '/' + id + '/' + k + (layout === 'booklet' ? '/booklet' : '')); };
-    const printBtn = h('button', { class: 'tbtn gold', disabled: true }, 'Görseller yükleniyor…');
+    const printBtn = h('button', { class: 'tbtn gold', disabled: true }, 'Loading pictures…');
     const kindBtns = Object.keys(KINDS).filter(function (k) { return scope === 'student' || k !== 'cards-all'; }).map(function (k) {
       return h('button', { class: 'tbtn ' + (k === kind ? 'primary' : ''), onclick: function () { go(k, booklet ? 'booklet' : 'a5'); } }, KINDS[k]);
     });
     const layoutBtns = isAlbum ? h('div', { class: 'row', style: { marginTop: '10px' } },
-      h('b', null, 'Düzen:'),
-      h('button', { class: 'tbtn ' + (booklet ? '' : 'primary'), onclick: function () { go(kind, 'a5'); } }, 'Ayrı A5 sayfalar'),
-      h('button', { class: 'tbtn ' + (booklet ? 'primary' : ''), onclick: function () { go(kind, 'booklet'); } }, 'A4 katlamalı kitapçık')) : null;
+      h('b', null, 'Layout:'),
+      h('button', { class: 'tbtn ' + (booklet ? '' : 'primary'), onclick: function () { go(kind, 'a5'); } }, 'Separate A5 pages'),
+      h('button', { class: 'tbtn ' + (booklet ? 'primary' : ''), onclick: function () { go(kind, 'booklet'); } }, 'A4 folded booklet')) : null;
 
     const sheets = Math.ceil(pageCount / 4) * (booklet ? 1 : 0);
     const note = booklet
-      ? ['Çıktı biçimi: A4 katlamalı kitapçık. Her A4 yatay yaprağın iki yüzüne ikişer A5 sayfa basılır; öğrenci başına ',
-        Math.ceil(pageCount / students.length / 4) + ' A4 yaprak (' + sheets + ' yaprak toplam, ' + (sheets * 2) + ' yüz). ',
-        'Yazdırma penceresinde: Kâğıt “A4”, Yön “Yatay”, Ölçek “%100 / Gerçek boyut”, Kenar boşlukları “Yok”, “Arka plan grafikleri” açık, ',
-        '“Çift taraflı – kısa kenardan çevir”. Yaprakları sırasıyla üst üste koyup ortadan katlayın ve sırttan zımbalayın. ',
-        'Yazıcınız çift taraflı basmıyorsa önce tek sayfaları, sonra kâğıdı ters çevirip çift sayfaları basın. A5 sayfa ölçüleri ve kart yuvaları değişmez (57 × 47,5 mm).']
-      : ['Çıktı biçimi: ayrı A5 dikey sayfalar (148 × 210 mm), her albüm sayfası ayrı bir yaprak – ', pageCount + ' sayfa. ',
-        'Yazdırma penceresinde: Kâğıt boyutu “A5”, Ölçek “%100 / Gerçek boyut”, Kenar boşlukları “Yok” veya “Varsayılan”, “Arka plan grafikleri” açık. ',
-        'PDF için hedef olarak “PDF olarak kaydet” seçin. ',
-        isAlbum ? 'A4 kâğıda basıp katlamak için yukarıdan “A4 katlamalı kitapçık” düzenini seçin. ' : '',
-        'Kart baskısı albüm yuvasıyla aynı ölçüdedir (57 × 47,5 mm); kesik çizgiden kesip yuvaya yapıştırın.'];
+      ? ['Output: A4 folded booklet. Two A5 pages are printed on each side of a landscape A4 sheet; ',
+        Math.ceil(pageCount / students.length / 4) + ' A4 sheets per student (' + sheets + ' sheets in total, ' + (sheets * 2) + ' sides). ',
+        'In the print dialog: paper “A4”, layout “Landscape”, scale “100% / Actual size”, margins “None”, “Background graphics” on, ',
+        '“Two-sided – flip on short edge”. Stack the sheets in order, fold them in the middle and staple along the fold. ',
+        'If your printer cannot print on both sides, print the odd pages, turn the paper over, then print the even pages. The A5 page size and card slots stay the same (57 × 47.5 mm).']
+      : ['Output: separate A5 portrait pages (148 × 210 mm), one album page per sheet – ', pageCount + (pageCount === 1 ? ' page. ' : ' pages. '),
+        'In the print dialog: paper size “A5”, scale “100% / Actual size”, margins “None” or “Default”, “Background graphics” on. ',
+        'For a PDF, choose “Save as PDF” as the destination. ',
+        isAlbum ? 'To print on A4 paper and fold it, choose the “A4 folded booklet” layout above. ' : '',
+        'Printed cards are the same size as the album slots (57 × 47.5 mm): cut along the dashed line and stick them in.'];
 
     const toolbar = h('div', { class: 'print-toolbar' },
       h('div', { class: 'row' },
-        h('b', { style: { fontSize: '1.15rem', marginRight: '8px' } }, 'Yazdır: ' + title),
+        h('b', { style: { fontSize: '1.15rem', marginRight: '8px' } }, 'Print: ' + title),
         kindBtns,
         h('span', { class: 'spacer' }),
         printBtn,
-        h('button', { class: 'tbtn on-dark', onclick: function () { setPageSize(false); MP.app.go(backHash); } }, 'Kapat')),
+        h('button', { class: 'tbtn on-dark', onclick: function () { setPageSize(false); MP.app.go(backHash); } }, 'Close')),
       layoutBtns,
       h('div', { class: 't-note' }, note));
 
@@ -189,7 +189,7 @@ window.MP = window.MP || {};
     await Promise.all(imgs.map(function (img) { return img.decode ? img.decode().catch(function () {}) : Promise.resolve(); }));
     if (!holder.isConnected) return;
     printBtn.disabled = !nodes.length;
-    printBtn.textContent = 'Yazdır / PDF olarak kaydet';
+    printBtn.textContent = 'Print / Save as PDF';
     printBtn.onclick = function () { window.print(); };
   }
 

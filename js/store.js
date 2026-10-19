@@ -1,7 +1,7 @@
 /*
  * Magic Picker data layer (IndexedDB, local to this browser profile on this device).
  *
- * Backup validation messages are Turkish: they are only shown in the teacher panel.
+ * All messages are in English, like the rest of the app.
  *
  * Every write runs inside ONE IndexedDB transaction and the returned promise resolves only
  * after that transaction has committed. If anything fails the whole transaction is aborted,
@@ -596,54 +596,54 @@ window.MP = window.MP || {};
     const errors = [];
     const err = function (m) { if (errors.length < 12) errors.push(m); };
     const isStr = function (v) { return typeof v === 'string' && v.length > 0; };
-    if (!obj || typeof obj !== 'object') return { ok: false, errors: ['Bu dosya bir Magic Picker yedeği değil.'] };
-    if (obj.app !== 'magic-picker') err('Bu dosya bir Magic Picker yedeği değil.');
-    if (obj.format !== 1) err('Bilinmeyen yedek biçimi sürümü.');
+    if (!obj || typeof obj !== 'object') return { ok: false, errors: ['This file is not a Magic Picker backup.'] };
+    if (obj.app !== 'magic-picker') err('This file is not a Magic Picker backup.');
+    if (obj.format !== 1) err('Unknown backup format version.');
     const d = obj.data;
-    if (!d || typeof d !== 'object') { err('Yedekte veri bölümü yok.'); return { ok: false, errors: errors }; }
+    if (!d || typeof d !== 'object') { err('The backup has no data section.'); return { ok: false, errors: errors }; }
     const st = d.settings;
-    if (!st || st.key !== 'settings' || !isInt(st.starsPerCard) || st.starsPerCard < 1 || st.starsPerCard > 100) err('Ayarlar eksik veya geçersiz.');
-    for (const name of BACKUP_STORES) if (!Array.isArray(d[name])) err('Eksik liste: ' + name + '.');
+    if (!st || st.key !== 'settings' || !isInt(st.starsPerCard) || st.starsPerCard < 1 || st.starsPerCard > 100) err('Settings are missing or invalid.');
+    for (const name of BACKUP_STORES) if (!Array.isArray(d[name])) err('Missing list: ' + name + '.');
     if (errors.length) return { ok: false, errors: errors };
 
     const classIds = new Set(), studentIds = new Set(), ownedIds = new Set(), txIds = new Set(), pairs = new Set();
     d.classes.forEach(function (c, i) {
-      if (!c || !isStr(c.id) || !isStr(c.name)) err((i + 1) + '. sınıf kaydı geçersiz.');
-      else if (classIds.has(c.id)) err('Aynı sınıf kimliği iki kez geçiyor.');
+      if (!c || !isStr(c.id) || !isStr(c.name)) err('Class #' + (i + 1) + ' is invalid.');
+      else if (classIds.has(c.id)) err('Duplicate class ID.');
       else classIds.add(c.id);
     });
     const students = {};
     d.students.forEach(function (s, i) {
-      if (!s || !isStr(s.id) || !isStr(s.name) || !isStr(s.classId)) { err((i + 1) + '. öğrenci kaydı geçersiz.'); return; }
-      if (studentIds.has(s.id)) err('Aynı öğrenci kimliği iki kez geçiyor.');
+      if (!s || !isStr(s.id) || !isStr(s.name) || !isStr(s.classId)) { err('Student #' + (i + 1) + ' is invalid.'); return; }
+      if (studentIds.has(s.id)) err('Duplicate student ID.');
       studentIds.add(s.id); students[s.id] = s;
-      if (!classIds.has(s.classId)) err('"' + s.name + '" olmayan bir sınıfa bağlı.');
-      if (!isInt(s.balance) || s.balance < 0) err('"' + s.name + '" için yıldız bakiyesi geçersiz.');
-      if (!isInt(s.totalEarned) || s.totalEarned < 0) err('"' + s.name + '" için toplam yıldız geçersiz.');
-      if (isInt(s.balance) && isInt(s.totalEarned) && s.balance > s.totalEarned) err('"' + s.name + '" için bakiye, toplam kazanılandan büyük.');
-      if (!isStr(s.createdAt)) err('"' + s.name + '" için oluşturulma tarihi yok.');
+      if (!classIds.has(s.classId)) err('Student "' + s.name + '" belongs to a missing class.');
+      if (!isInt(s.balance) || s.balance < 0) err('Student "' + s.name + '" has an invalid star balance.');
+      if (!isInt(s.totalEarned) || s.totalEarned < 0) err('Student "' + s.name + '" has an invalid star total.');
+      if (isInt(s.balance) && isInt(s.totalEarned) && s.balance > s.totalEarned) err('Student "' + s.name + '" has more stars to spend than stars earned.');
+      if (!isStr(s.createdAt)) err('Student "' + s.name + '" has no creation date.');
     });
     d.owned.forEach(function (o, i) {
-      if (!o || !isStr(o.id) || !isStr(o.studentId) || !isStr(o.cardId) || !isStr(o.earnedAt)) { err((i + 1) + '. kart kaydı geçersiz.'); return; }
-      if (ownedIds.has(o.id)) err('Aynı kart kaydı kimliği iki kez geçiyor.');
+      if (!o || !isStr(o.id) || !isStr(o.studentId) || !isStr(o.cardId) || !isStr(o.earnedAt)) { err('Card record #' + (i + 1) + ' is invalid.'); return; }
+      if (ownedIds.has(o.id)) err('Duplicate card record ID.');
       ownedIds.add(o.id);
-      if (!studentIds.has(o.studentId)) err('Bir kart olmayan bir öğrenciye bağlı.');
-      if (!MP.CARD_BY_ID[o.cardId]) err('Bilinmeyen kart kimliği: ' + String(o.cardId).slice(0, 20) + '.');
+      if (!studentIds.has(o.studentId)) err('A card belongs to a missing student.');
+      if (!MP.CARD_BY_ID[o.cardId]) err('Unknown card ID: ' + String(o.cardId).slice(0, 20) + '.');
       const k = o.studentId + '|' + o.cardId;
-      if (pairs.has(k)) err('Bir öğrencide aynı kart iki kez var.');
+      if (pairs.has(k)) err('The same card appears twice for one student.');
       pairs.add(k);
     });
     d.txs.forEach(function (x, i) {
-      if (!x || !isStr(x.id) || TX_TYPES.indexOf(x.type) < 0 || !isStr(x.studentId) || !isStr(x.createdAt)) { err((i + 1) + '. geçmiş kaydı geçersiz.'); return; }
-      if (txIds.has(x.id)) err('Aynı geçmiş kimliği iki kez geçiyor.');
+      if (!x || !isStr(x.id) || TX_TYPES.indexOf(x.type) < 0 || !isStr(x.studentId) || !isStr(x.createdAt)) { err('History entry #' + (i + 1) + ' is invalid.'); return; }
+      if (txIds.has(x.id)) err('Duplicate history ID.');
       txIds.add(x.id);
-      if (!studentIds.has(x.studentId)) err('Bir geçmiş kaydı olmayan bir öğrenciye bağlı.');
-      if (x.type === 'stars' && (!isInt(x.amount) || x.amount < 1)) err('Bir yıldız kaydının miktarı geçersiz.');
-      if (x.type === 'card' && (!MP.CARD_BY_ID[x.cardId] || !isInt(x.cost) || x.cost < 1)) err('Bir kart işlemi geçersiz.');
-      if (x.type === 'card' && !x.undone && !ownedIds.has(x.ownedId)) err('Bir kart işlemi olmayan bir karta işaret ediyor.');
+      if (!studentIds.has(x.studentId)) err('A history entry belongs to a missing student.');
+      if (x.type === 'stars' && (!isInt(x.amount) || x.amount < 1)) err('A star entry has an invalid amount.');
+      if (x.type === 'card' && (!MP.CARD_BY_ID[x.cardId] || !isInt(x.cost) || x.cost < 1)) err('A card entry is invalid.');
+      if (x.type === 'card' && !x.undone && !ownedIds.has(x.ownedId)) err('A card entry points to a missing card.');
     });
     d.rounds.forEach(function (r) {
-      if (!r || !isStr(r.classId) || !Array.isArray(r.picked)) err('Öğrenci seçme turu verisi geçersiz.');
+      if (!r || !isStr(r.classId) || !Array.isArray(r.picked)) err('Picker round data is invalid.');
     });
     return {
       ok: errors.length === 0, errors: errors,
