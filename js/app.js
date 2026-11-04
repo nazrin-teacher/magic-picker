@@ -42,6 +42,7 @@ window.MP = window.MP || {};
       if (mq.addEventListener) mq.addEventListener('change', applySettings);
     }
     route();
+    if (MP.cloud) MP.cloud.start().catch(function (e) { console.error('Cloud saving could not start', e); });
   }
 
   function applySettings() {
@@ -225,7 +226,16 @@ window.MP = window.MP || {};
         },
           h('span', { class: 'tile-top' }, MP.symbolEl(s.symbol, 'sym-tile'), h('span', { class: 'name' }, s.name)),
           bottom);
-        return tile;
+        // Teacher mode: quick +1 star right on the class screen (a separate button, not nested inside the tile).
+        if (!state.teacher || marking || away.has(s.id)) return tile;
+        const quick = h('button', { class: 'tile-star', type: 'button', 'aria-label': 'Give 1 star to ' + s.name }, '+1', icon('star'));
+        quick.onclick = function () {
+          award([s.id], 1, quick).then(function (r) {
+            const fresh = r && r.students && r.students[0];
+            if (fresh) { s.balance = fresh.balance; bottom.replaceChildren(tileBottom(s)); }
+          }, function () {});
+        };
+        return h('div', { class: 'tile-wrap' }, tile, quick);
       }))
       : h('div', { class: 'panel empty-state' },
         h('p', null, 'No students in ' + cls.name + ' yet.'),

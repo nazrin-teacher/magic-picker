@@ -106,13 +106,25 @@ window.MP = window.MP || {};
    * Run `body(t)` inside one transaction. Only IndexedDB requests may be awaited inside body,
    * otherwise the transaction would auto-commit early. Resolves after commit, rejects after abort.
    */
-  async function run(names, mode, body) {
+  /* Listeners are told after every committed change (used by the cloud sync). */
+  const changeListeners = [];
+  function onChange(fn) { changeListeners.push(fn); }
+  function notifyChange() {
+    changeListeners.forEach(function (fn) { try { fn(); } catch (e) { console.error(e); } });
+  }
+
+  async function run(names, mode, body, opts) {
     const db = await openDB();
+    const silent = !!(opts && opts.silent);
     return new Promise(function (resolve, reject) {
       let t;
       try { t = db.transaction(names, mode); } catch (e) { reject(e); return; }
       let result, failure = null;
-      t.oncomplete = function () { if (failure) reject(failure); else resolve(result); };
+      t.oncomplete = function () {
+        if (failure) { reject(failure); return; }
+        resolve(result);
+        if (mode === 'readwrite' && !silent) notifyChange();
+      };
       t.onabort = function () { reject(failure || t.error || StoreError('ABORTED', 'The change was not saved.')); };
       Promise.resolve()
         .then(function () { return body(t); })
@@ -763,6 +775,42 @@ window.MP = window.MP || {};
     });
   }
 
+  /* ---------- cloud sync support ---------- */
+  /* Sync state lives in the same database, so wiping the browser data also forgets it (the device then counts as new). */
+  function getCloudState() {
+    return run(['meta'], 'readonly', function (t) { return req(S(t, 'meta').get('cloud')); });
+  }
+  function setCloudState(v) {
+    return run(['meta'], 'readwrite', function (t) { return req(S(t, 'meta').put(Object.assign({}, v, { key: 'cloud' }))); }, { silent: true });
+  }
+  /*
+   * Replaces the data with a snapshot from the cloud in one transaction. Keeps this device's
+   * "who's here today" marks, the backup reminder and the built-in class list marker, and stores the sync state.
+   */
+  function applyCloudSnapshot(obj, cloudState) {
+    const v = validateBackup(obj);
+    if (!v.ok) return Promise.reject(Object.assign(StoreError('INVALID_BACKUP', 'The cloud data is not valid.'), { details: v.errors }));
+    return run(ALL_STORES, 'readwrite', async function (t) {
+      const keep = (await req(S(t, 'meta').getAll())).filter(function (m) {
+        return /^absent:/.test(m.key) || m.key === 'roster' || m.key === 'lastBackup';
+      });
+      for (const name of ALL_STORES) await req(S(t, name).clear());
+      await req(S(t, 'meta').add(Object.assign({}, obj.data.settings, { key: 'settings' })));
+      for (const name of BACKUP_STORES) {
+        for (const row of obj.data[name]) await req(S(t, name).add(row));
+      }
+      const maxSeq = obj.data.txs.reduce(function (m, x) { return Math.max(m, isInt(x.seq) ? x.seq : 0); }, 0);
+      await req(S(t, 'meta').put({ key: 'seq', value: maxSeq }));
+      for (const m of keep) await req(S(t, 'meta').put(m));
+      if (!keep.some(function (m) { return m.key === 'roster'; }) && MP.ROSTER_VERSION) {
+        // The cloud data already contains the class lists; never add the built-in lists on top of it.
+        await req(S(t, 'meta').put({ key: 'roster', version: MP.ROSTER_VERSION, appliedAt: now(), added: 0 }));
+      }
+      if (cloudState) await req(S(t, 'meta').put(Object.assign({}, cloudState, { key: 'cloud' })));
+      return v.summary;
+    }, { silent: true });
+  }
+
   function resetAll() {
     return run(ALL_STORES, 'readwrite', async function (t) {
       for (const name of ALL_STORES) await req(S(t, name).clear());
@@ -858,6 +906,7 @@ window.MP = window.MP || {};
     peekUndo, undoLast, listTxs,
     getRound, setNoRepeats, newRound, pickStudent,
     exportBackup, validateBackup, restoreBackup, resetAll,
+    onChange, getCloudState, setCloudState, applyCloudSnapshot,
     applyRoster, loadDemo, removeDemo, requestPersistence, useDatabase, close,
     uuid, randInt
   };
