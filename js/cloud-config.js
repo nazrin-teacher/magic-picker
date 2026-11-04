@@ -12,6 +12,6 @@ window.MP_CLOUD_CONFIG = {
   },
   // All devices that use the same "space" share the same classes, stars and cards.
   space: 'magic-picker-main',
-  // Optional: fills in the email on the sign-in screen.
-  email: 'cinaryusuf5816@gmail.com'
+  // Optional: a teacher email shown on the sign-in screen (leave empty when several teachers use it).
+  email: ''
 };
