@@ -72,6 +72,11 @@ img { display: block; max-width: 100%; }
 }
 .tb-btn:hover { background: rgba(255, 255, 255, .18); }
 .tb-btn svg { width: 22px; height: 22px; }
+.cloud-btn[data-state="ok"] { border-color: #9ff3ee; }
+.cloud-btn[data-state="syncing"] { border-color: #ffe7a6; }
+.cloud-btn[data-state="signedOut"], .cloud-btn[data-state="offline"] { border-color: #f0c45c; background: rgba(240, 196, 92, .18); }
+.cloud-btn[data-state="error"] { border-color: #ff9b8a; background: rgba(255, 120, 100, .25); }
+.cloud-msg { min-height: 1.4em; color: #8a2a1a; font-weight: 600; }
 .tb-btn.is-teacher { background: var(--teal-d); border-color: #9ff3ee; }
 .class-chip {
   padding: 8px 16px; border-radius: 999px; background: var(--pearl); color: var(--ink);
@@ -186,6 +191,17 @@ img { display: block; max-width: 100%; }
   padding: 14px 16px; display: flex; flex-direction: column; align-items: flex-start; justify-content: space-between; gap: 8px; text-align: left;
 }
 .student-tile:active { transform: translateY(2px); }
+.tile-wrap { position: relative; display: grid; }
+.tile-wrap > .student-tile { width: 100%; }
+.tile-star {
+  position: absolute; bottom: 12px; right: 12px; min-width: 64px; min-height: 44px; padding: 4px 12px;
+  display: inline-flex; align-items: center; justify-content: center; gap: 4px;
+  border-radius: 14px; border: 2px solid #fff; background: linear-gradient(180deg, #3cc7bd, #1d8f88);
+  color: #fff; font: inherit; font-weight: 700; font-size: 1.2rem; cursor: pointer;
+  box-shadow: 0 4px 0 #136660, 0 6px 14px rgba(10, 5, 40, .3);
+}
+.tile-star:active { transform: translateY(2px); box-shadow: 0 2px 0 #136660; }
+.tile-star svg { width: 1.1em; height: 1.1em; }
 .student-tile .name { font-weight: 700; font-size: clamp(1.35rem, 2vw, 1.75rem); color: var(--ink); line-height: 1.15; word-break: break-word; }
 .star-badge {
   display: inline-flex; align-items: center; gap: 6px; padding: 4px 12px; border-radius: 999px;
