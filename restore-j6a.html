@@ -1,0 +1,123 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Restore J6A</title>
+<style>
+  body { font-family: system-ui, sans-serif; max-width: 860px; margin: 24px auto; padding: 0 16px; color: #241b45; background: #faf6ee; }
+  h1 { margin: 0 0 6px; }
+  p { line-height: 1.45; }
+  table { width: 100%; border-collapse: collapse; margin: 16px 0; background: #fff; border-radius: 12px; overflow: hidden; }
+  th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid #eadfca; font-size: 1rem; }
+  th { background: #f3ecdc; }
+  .ok { color: #1d7d55; font-weight: 600; }
+  .todo { color: #9a5b00; font-weight: 600; }
+  .err { color: #b3261e; font-weight: 600; }
+  button { font: inherit; font-weight: 700; font-size: 1.2rem; padding: 14px 26px; border-radius: 14px; border: 0; cursor: pointer; }
+  #go { background: #d8a43c; color: #2a1a00; }
+  #go[disabled] { opacity: .5; cursor: default; }
+  a.back { display: inline-block; margin-top: 12px; font-size: 1.1rem; }
+  #msg { font-size: 1.1rem; font-weight: 600; }
+</style>
+</head>
+<body>
+<h1>Restore J6A – 3 November</h1>
+<p>This adds back the stars and first cards J6A earned on 3 November. Students who already have their card are left as they are, so running it twice changes nothing.</p>
+<p id="msg">Checking…</p>
+<button id="go" disabled>Restore J6A</button>
+<table><thead><tr><th>Student</th><th>Card</th><th>Stars earned</th><th>Now</th></tr></thead><tbody id="rows"></tbody></table>
+<a class="back" href="./#/">← Back to Magic Picker</a>
+
+<script src="js/cards.js?v=10"></script>
+<script src="js/roster.js?v=10"></script>
+<script src="js/symbols.js?v=10"></script>
+<script src="js/store.js?v=10"></script>
+<script>
+(function () {
+  // Read from the teacher history on 3 Nov 2026 (oldest first). earned = all stars given that day.
+  const PLAN = [
+    { name: 'Helen K.', earned: 6, card: 'won-05' },
+    { name: 'Bade Y.', earned: 6, card: 'won-01' },
+    { name: 'Alina Ecem G.', earned: 5, card: 'won-16' },
+    { name: 'Atlas A.', earned: 5, card: 'adv-01' },
+    { name: 'Barış B.', earned: 2, card: null },
+    { name: 'Cansın A.', earned: 5, card: 'won-03' },
+    { name: 'Çağrı Y.', earned: 5, card: 'adv-05' },
+    { name: 'Deniz K.', earned: 5, card: 'adv-07' },
+    { name: 'Eliz Ada Ş.', earned: 5, card: 'won-09' },
+    { name: 'Emir D.', earned: 2, card: null },
+    { name: 'Göktuğ', earned: 5, card: 'adv-10' },
+    { name: 'Gül Bilge E.', earned: 5, card: 'won-09' },
+    { name: 'Karan Ö.', earned: 5, card: 'adv-04' },
+    { name: 'Lina Y.', earned: 5, card: 'won-04' },
+    { name: 'Nehir Ç.', earned: 5, card: 'won-02' },
+    { name: 'Ömer Ç.', earned: 5, card: 'adv-07' },
+    { name: 'Yade S.', earned: 5, card: 'won-05' },
+    { name: 'Ahsen', earned: 5, card: 'won-18' },
+    { name: 'Asil Ç.', earned: 5, card: 'adv-15' },
+    { name: 'Tuna G.', earned: 5, card: 'adv-05' }
+  ];
+  const st = MP.store;
+  const msg = document.getElementById('msg'), go = document.getElementById('go'), rows = document.getElementById('rows');
+  let cls = null, work = [];
+
+  function cardName(id) { const c = id && MP.CARD_BY_ID[id]; return c ? (c.collection === 'adventure' ? 'Adventure ' : 'Wonder ') + c.number + ' – ' + c.name : '–'; }
+
+  async function check() {
+    cls = (await st.listClasses({ includeArchived: true })).find(function (c) { return c.name.toUpperCase() === 'J6A'; });
+    if (!cls) { msg.textContent = 'Class J6A was not found. Open Magic Picker once, then come back.'; msg.className = 'err'; return; }
+    const students = await st.listStudents(cls.id, { includeArchived: true });
+    work = [];
+    rows.replaceChildren();
+    for (const p of PLAN) {
+      const s = students.find(function (x) { return x.name.trim().toLowerCase() === p.name.toLowerCase(); });
+      let state, need = false;
+      if (!s) state = ['err', 'not in J6A'];
+      else {
+        const owned = await st.getOwned(s.id);
+        const hasCard = !p.card || Object.values(owned).some(function (o) { return o.cardId === p.card; });
+        const missingStars = Math.max(0, p.earned - s.totalEarned);
+        need = !hasCard || missingStars > 0;
+        state = need ? ['todo', (hasCard ? '' : 'card missing') + (!hasCard && missingStars ? ', ' : '') + (missingStars ? missingStars + ' stars missing' : '')] : ['ok', 'already there'];
+        if (need) work.push({ s: s, p: p, hasCard: hasCard, missingStars: missingStars });
+      }
+      const tr = document.createElement('tr');
+      [p.name, cardName(p.card), String(p.earned)].forEach(function (t) { const td = document.createElement('td'); td.textContent = t; tr.appendChild(td); });
+      const td = document.createElement('td'); td.className = state[0]; td.textContent = state[1]; tr.appendChild(td);
+      rows.appendChild(tr);
+    }
+    if (work.length) { msg.textContent = work.length + ' students need restoring. Tap the button.'; msg.className = 'todo'; go.disabled = false; }
+    else { msg.textContent = 'Everything is already there. Nothing to do.'; msg.className = 'ok'; go.disabled = true; }
+  }
+
+  go.addEventListener('click', async function () {
+    go.disabled = true; msg.textContent = 'Restoring…'; msg.className = '';
+    const cost = (await st.getSettings()).starsPerCard;
+    const failed = [];
+    for (const w of work) {
+      try {
+        const fresh = await st.getStudent(w.s.id);
+        let give = w.missingStars;
+        if (!w.hasCard) give = Math.max(give, cost - fresh.balance);
+        if (give > 0) await st.awardStars([fresh.id], give, { requestId: st.uuid() });
+        if (!w.hasCard) await st.buyCard(fresh.id, w.p.card, { requestId: st.uuid() });
+      } catch (e) { failed.push(w.p.name + ' (' + (e.message || e) + ')'); }
+    }
+    await check();
+    if (failed.length) { msg.textContent = 'Could not restore: ' + failed.join(', '); msg.className = 'err'; }
+    else { msg.textContent = 'Done! J6A is restored.'; msg.className = 'ok'; }
+  });
+
+  (async function () {
+    try {
+      await st.init();
+      try { await st.applyRoster(MP.CLASS_ROSTER, MP.ROSTER_VERSION); } catch (e) { console.error(e); }
+      try { await st.ensureSymbols(); } catch (e) { console.error(e); }
+      await check();
+    } catch (e) { msg.textContent = 'This browser blocked the saved data: ' + (e.message || e); msg.className = 'err'; }
+  })();
+})();
+</script>
+</body>
+</html>

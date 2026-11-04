@@ -9,8 +9,8 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <!-- Optional web fonts; without internet the app falls back to built-in rounded / serif fonts. -->
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cinzel+Decorative:wght@700;900&family=Fredoka:wght@400;500;600;700&display=swap">
-<link rel="stylesheet" href="css/app.css?v=8">
-<link rel="stylesheet" href="css/print.css?v=8">
+<link rel="stylesheet" href="css/app.css?v=10">
+<link rel="stylesheet" href="css/print.css?v=10">
 <link rel="preload" as="image" href="assets/stage.jpg">
 </head>
 <body>
@@ -20,6 +20,7 @@
   <button class="brand" type="button" aria-label="Magic Picker – back to classes">Magic Picker</button>
   <div class="topbar-right">
     <span id="classChip" class="class-chip" hidden></span>
+    <button id="cloudBtn" class="tb-btn cloud-btn" type="button" hidden></button>
     <button id="soundBtn" class="tb-btn" type="button" aria-pressed="true">Sound on</button>
     <button id="lockBtn" class="tb-btn" type="button" hidden>Lock</button>
     <button id="teacherBtn" class="tb-btn" type="button">Teacher</button>
@@ -35,14 +36,16 @@
 <div id="toasts" class="toasts" aria-live="polite"></div>
 <div id="print-root"></div>
 
-<script src="js/cards.js?v=8"></script>
-<script src="js/roster.js?v=8"></script>
-<script src="js/symbols.js?v=8"></script>
-<script src="js/store.js?v=8"></script>
-<script src="js/ui.js?v=8"></script>
-<script src="js/sound.js?v=8"></script>
-<script src="js/print.js?v=8"></script>
-<script src="js/teacher.js?v=8"></script>
-<script src="js/app.js?v=8"></script>
+<script src="js/cards.js?v=10"></script>
+<script src="js/roster.js?v=10"></script>
+<script src="js/symbols.js?v=10"></script>
+<script src="js/store.js?v=10"></script>
+<script src="js/ui.js?v=10"></script>
+<script src="js/sound.js?v=10"></script>
+<script src="js/print.js?v=10"></script>
+<script src="js/teacher.js?v=10"></script>
+<script src="js/cloud-config.js?v=10"></script>
+<script src="js/cloud.js?v=10"></script>
+<script src="js/app.js?v=10"></script>
 </body>
 </html>

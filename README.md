@@ -51,10 +51,22 @@ Card sheets are always A5; printed cards are the same size as the album slots: 5
 
 ## Data and safety
 
-- Data stays only in this browser on this device; it does **not sync** between devices and there is no cloud copy. Download a backup regularly from Backup & Data → **Download backup (JSON)**. The teacher panel reminds you when no backup has been made for 7 days.
+- Without cloud saving, data stays only in this browser on this device; it does **not sync** between devices. Download a backup regularly from Backup & Data → **Download backup (JSON)**. The teacher panel reminds you when no backup has been made for 7 days.
 - Restoring checks the file first; a broken file does not change the current data.
 - The PIN only hides the teacher tools on this screen; it is **not real authentication** and it does not encrypt the data.
 - The 2025–2026 class lists are built in (`js/roster.js`) as first name + surname initial only. On each device they are loaded once into classes that are still empty; names you add, edit or delete afterwards are never overwritten.
+
+## Cloud saving (optional)
+
+With cloud saving switched on, classes, stars and cards are kept in Firebase as well. Every device where a teacher signs in shows the same data and can make changes; a board that wipes its browser data loads everything back after signing in. Without it, the app works locally as described above.
+
+1. Create a free Firebase project at https://console.firebase.google.com.
+2. **Build → Authentication → Sign-in method:** enable **Google**. Under **Settings → Authorized domains**, add `nazrin-teacher.github.io`.
+3. **Build → Firestore Database:** create a database (production mode, a European location). Under **Rules**, paste `firestore.rules` and put the teacher email(s) in the list.
+4. **Project settings → Your apps → Web (</>):** register an app and copy `apiKey`, `authDomain`, `projectId`, `appId` into `js/cloud-config.js`.
+5. Upload the files. On each device tap **Cloud: sign in** at the top and sign in once with the teacher Google account.
+
+How it works: changes are uploaded a second or two after they happen; newer cloud data is downloaded when the app opens, comes back to the front, and every 30 seconds. If two devices change things at the same time, both sets of stars and cards are kept. A device whose browser data was wiped takes the cloud data as it is (changes made on it before signing in are not kept). “Who's here today” stays on each device. Firebase (13.2.0) is loaded from Google’s CDN (gstatic.com), so cloud saving needs internet; the app itself still works offline.
 
 ## Files
 
@@ -62,4 +74,5 @@ Card sheets are always A5; printed cards are the same size as the album slots: 5
 - `assets/cards/adv-01…20.jpg` (Adventure) and `won-01…20.jpg` (Wonder) – the 40 cards, 264×220 px
 - `assets/card-back.jpg`, `assets/stage.jpg`, `assets/source/` – card back, stage background and the original sheets
 - `tools/crop-cards.sh` – re-cuts the cards from the original sheets (macOS `sips`)
+- `js/cloud.js`, `js/cloud-config.js`, `firestore.rules` – optional cloud saving
 - `tests.html` – data-layer scenario tests (uses its own test database, never the real data)

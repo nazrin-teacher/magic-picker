@@ -1,0 +1,11 @@
+rules_version = '2';
+// Only the listed teacher Google accounts (verified email) can read or change Magic Picker data. Everyone else is refused.
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /spaces/{space}/{document=**} {
+      allow read, write: if request.auth != null
+        && request.auth.token.email_verified == true
+        && request.auth.token.email in ['cinaryusuf5816@gmail.com'];
+    }
+  }
+}
